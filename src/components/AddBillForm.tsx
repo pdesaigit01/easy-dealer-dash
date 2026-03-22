@@ -24,42 +24,61 @@ export default function AddBillForm({ onBillAdded }: Props) {
   const [newPartyName, setNewPartyName] = useState("");
   const [newPartyPhone, setNewPartyPhone] = useState("");
   const [partyDialogOpen, setPartyDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setParties(getParties());
-  }, []);
-
-  const handleAddParty = () => {
-    if (!newPartyName.trim()) return;
-    const p = addParty(newPartyName, newPartyPhone);
-    setParties(getParties());
-    setSelectedPartyId(p.id);
-    setNewPartyName("");
-    setNewPartyPhone("");
-    setPartyDialogOpen(false);
-    toast.success(`Party "${p.name}" added`);
+  const loadParties = async () => {
+    try {
+      setParties(await getParties());
+    } catch (e: any) {
+      toast.error("Failed to load parties");
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => { loadParties(); }, []);
+
+  const handleAddParty = async () => {
+    if (!newPartyName.trim()) return;
+    setLoading(true);
+    try {
+      const p = await addParty(newPartyName, newPartyPhone);
+      await loadParties();
+      setSelectedPartyId(p.id);
+      setNewPartyName("");
+      setNewPartyPhone("");
+      setPartyDialogOpen(false);
+      toast.success(`Party "${p.name}" added`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to add party");
+    }
+    setLoading(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const party = parties.find((p) => p.id === selectedPartyId);
     if (!party || !invoiceNumber.trim() || !amount) {
       toast.error("Please fill all required fields");
       return;
     }
-    addBill({
-      partyId: party.id,
-      partyName: party.name,
-      invoiceNumber: invoiceNumber.trim(),
-      date,
-      amount: parseFloat(amount),
-      notes: notes.trim() || undefined,
-    });
-    toast.success("Bill added successfully");
-    setInvoiceNumber("");
-    setAmount("");
-    setNotes("");
-    onBillAdded();
+    setLoading(true);
+    try {
+      await addBill({
+        party_id: party.id,
+        party_name: party.name,
+        invoice_number: invoiceNumber.trim(),
+        date,
+        amount: parseFloat(amount),
+        notes: notes.trim() || undefined,
+      });
+      toast.success("Bill added successfully");
+      setInvoiceNumber("");
+      setAmount("");
+      setNotes("");
+      onBillAdded();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to add bill");
+    }
+    setLoading(false);
   };
 
   return (
@@ -98,7 +117,7 @@ export default function AddBillForm({ onBillAdded }: Props) {
                 <Label>Phone (optional)</Label>
                 <Input value={newPartyPhone} onChange={(e) => setNewPartyPhone(e.target.value)} placeholder="Phone number" />
               </div>
-              <Button type="button" onClick={handleAddParty} className="w-full">
+              <Button type="button" onClick={handleAddParty} className="w-full" disabled={loading}>
                 <Plus className="h-4 w-4 mr-2" /> Add Party
               </Button>
             </div>
@@ -127,8 +146,8 @@ export default function AddBillForm({ onBillAdded }: Props) {
         <Input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any remarks..." />
       </div>
 
-      <Button type="submit" className="w-full">
-        <Plus className="h-4 w-4 mr-2" /> Add Bill
+      <Button type="submit" className="w-full" disabled={loading}>
+        <Plus className="h-4 w-4 mr-2" /> {loading ? "Adding..." : "Add Bill"}
       </Button>
     </form>
   );

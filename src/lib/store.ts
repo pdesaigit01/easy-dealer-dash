@@ -1,58 +1,50 @@
-import { Party, Bill } from "./types";
+import { supabase } from "@/integrations/supabase/client";
 
-const PARTIES_KEY = "shop_parties";
-const BILLS_KEY = "shop_bills";
-
-export function getParties(): Party[] {
-  const data = localStorage.getItem(PARTIES_KEY);
-  return data ? JSON.parse(data) : [];
+export async function getParties() {
+  const { data, error } = await supabase.from("parties").select("*").order("name");
+  if (error) throw error;
+  return data;
 }
 
-export function saveParties(parties: Party[]) {
-  localStorage.setItem(PARTIES_KEY, JSON.stringify(parties));
+export async function addParty(name: string, phone?: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  const { data, error } = await supabase
+    .from("parties")
+    .insert({ name: name.trim(), phone: phone?.trim() || null, user_id: user.id })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
-export function addParty(name: string, phone?: string): Party {
-  const parties = getParties();
-  const party: Party = {
-    id: crypto.randomUUID(),
-    name: name.trim(),
-    phone: phone?.trim(),
-    createdAt: new Date().toISOString(),
-  };
-  parties.push(party);
-  saveParties(parties);
-  return party;
+export async function getBills() {
+  const { data, error } = await supabase.from("bills").select("*").order("date", { ascending: false });
+  if (error) throw error;
+  return data;
 }
 
-export function getBills(): Bill[] {
-  const data = localStorage.getItem(BILLS_KEY);
-  return data ? JSON.parse(data) : [];
+export async function addBill(bill: { party_id: string; party_name: string; invoice_number: string; date: string; amount: number; notes?: string }) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  const { data, error } = await supabase
+    .from("bills")
+    .insert({ ...bill, user_id: user.id })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
-export function saveBills(bills: Bill[]) {
-  localStorage.setItem(BILLS_KEY, JSON.stringify(bills));
+export async function markBillPaid(billId: string) {
+  const { error } = await supabase
+    .from("bills")
+    .update({ is_paid: true, paid_at: new Date().toISOString() })
+    .eq("id", billId);
+  if (error) throw error;
 }
 
-export function addBill(bill: Omit<Bill, "id" | "isPaid">): Bill {
-  const bills = getBills();
-  const newBill: Bill = { ...bill, id: crypto.randomUUID(), isPaid: false };
-  bills.push(newBill);
-  saveBills(bills);
-  return newBill;
-}
-
-export function markBillPaid(billId: string) {
-  const bills = getBills();
-  const idx = bills.findIndex((b) => b.id === billId);
-  if (idx !== -1) {
-    bills[idx].isPaid = true;
-    bills[idx].paidAt = new Date().toISOString();
-    saveBills(bills);
-  }
-}
-
-export function deleteBill(billId: string) {
-  const bills = getBills().filter((b) => b.id !== billId);
-  saveBills(bills);
+export async function deleteBill(billId: string) {
+  const { error } = await supabase.from("bills").delete().eq("id", billId);
+  if (error) throw error;
 }

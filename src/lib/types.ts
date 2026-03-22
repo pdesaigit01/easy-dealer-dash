@@ -1,18 +1,4 @@
-export interface Party {
-  id: string;
-  name: string;
-  phone?: string;
-  createdAt: string;
-}
+import type { Database } from "@/integrations/supabase/types";
 
-export interface Bill {
-  id: string;
-  partyId: string;
-  partyName: string;
-  invoiceNumber: string;
-  date: string;
-  amount: number;
-  notes?: string;
-  isPaid: boolean;
-  paidAt?: string;
-}
+export type Party = Database["public"]["Tables"]["parties"]["Row"];
+export type Bill = Database["public"]["Tables"]["bills"]["Row"];
